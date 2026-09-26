@@ -5,7 +5,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import os
 from pathlib import Path
 from typing import Callable
 
@@ -18,8 +17,6 @@ from split_youtube_songs import (
     safe_name,
     smart_title_from_info,
     smart_title_from_media_path,
-    acoustid_lookup_title,
-    load_dotenv,
 )
 
 
@@ -213,7 +210,6 @@ def process_stream(
     media_file: str | None,
     tracklist: str,
     auto_split: bool,
-    detect_audio_title: bool,
     silence_threshold_db: float,
     min_silence_duration: float,
     min_track_duration: float,
@@ -269,20 +265,6 @@ def process_stream(
         else:
             source = Path(media_file)
             title = smart_title_from_media_path(source)
-            if detect_audio_title:
-                if not os.environ.get("ACOUSTID_API_KEY"):
-                    load_dotenv()
-                api_key = os.environ.get("ACOUSTID_API_KEY", "")
-                try:
-                    detected = acoustid_lookup_title(source, api_key=api_key)
-                except FileNotFoundError:
-                    detected = None
-                    yield None, "Audio title detection needs Chromaprint `fpcalc` installed and on PATH."
-                    return
-                except Exception:
-                    detected = None
-                if detected:
-                    title = detected
             chapters = normalize_chapters(chapters_from_file(source), None)
             if not chapters and tracklist.strip():
                 chapters = normalize_chapters(chapters_from_description(tracklist, None), None)
@@ -322,7 +304,6 @@ def process_safe(
     media_file: str | None,
     tracklist: str,
     auto_split: bool,
-    detect_audio_title: bool,
     silence_threshold_db: float,
     min_silence_duration: float,
     min_track_duration: float,
@@ -334,7 +315,6 @@ def process_safe(
             media_file,
             tracklist,
             auto_split,
-            detect_audio_title,
             silence_threshold_db,
             min_silence_duration,
             min_track_duration,
@@ -364,10 +344,6 @@ with gr.Blocks(title="Song Splitter") as demo:
             label="Auto split by silence when no chapters/tracklist are found",
         )
 
-        detect_audio_title = gr.Checkbox(
-            value=False,
-            label="Detect title from audio (AcoustID, free; requires ACOUSTID_API_KEY + fpcalc)",
-        )
         silence_threshold_db = gr.Slider(
             minimum=-60,
             maximum=-10,
@@ -401,7 +377,6 @@ with gr.Blocks(title="Song Splitter") as demo:
             media_file,
             tracklist,
             auto_split,
-            detect_audio_title,
             silence_threshold_db,
             min_silence_duration,
             min_track_duration,

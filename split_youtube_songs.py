@@ -6,9 +6,6 @@ import re
 import shutil
 import subprocess
 import hashlib
-import os
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 DEFAULT_URL = "https://www.youtube.com/watch?v=6H6re5ECEZQ"
@@ -220,117 +217,6 @@ def smart_title_from_media_path(path: Path) -> str:
         return safe_name(candidate)
 
     return safe_name(stem or parent or "Untitled")
-
-
-def load_dotenv(dotenv_path: Path | None = None, *, override: bool = False) -> None:
-    """Load simple KEY=VALUE pairs from a .env file into os.environ.
-
-    This is intentionally minimal (no dependency on python-dotenv).
-    Existing environment variables are preserved unless override=True.
-    """
-
-    path = dotenv_path or (Path.cwd() / ".env")
-    if not path.exists():
-        return
-
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export ") :].lstrip()
-        if "=" not in line:
-            continue
-
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if not key:
-            continue
-        if not override and key in os.environ:
-            continue
-
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("\"", "'"):
-            value = value[1:-1]
-
-        os.environ[key] = value
-
-
-def acoustid_lookup_title(path: Path, *, api_key: str, fingerprint_seconds: int = 120) -> str | None:
-    """Recognize a track title via AcoustID (free) using Chromaprint's fpcalc.
-
-    Requires `fpcalc` in PATH and an AcoustID client API key.
-    Does not upload the audio file, only an acoustic fingerprint.
-    """
-
-    if not api_key.strip():
-        raise ValueError("Missing AcoustID API key")
-
-    # fpcalc outputs JSON: {"duration": 123, "fingerprint": "..."}
-    raw = run([
-        "fpcalc",
-        "-json",
-        "-length",
-        str(int(fingerprint_seconds)),
-        str(path),
-    ], True)
-    try:
-        fp = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"fpcalc returned invalid JSON: {raw[:200]!r}") from e
-
-    duration = fp.get("duration")
-    fingerprint = fp.get("fingerprint")
-    if not duration or not fingerprint:
-        return None
-
-    data = urllib.parse.urlencode({
-        "client": api_key.strip(),
-        "meta": "recordings+releasegroups+artists",
-        "duration": str(int(float(duration))),
-        "fingerprint": fingerprint,
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://api.acoustid.org/v2/lookup",
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        payload = resp.read().decode("utf-8", errors="replace")
-    try:
-        result = json.loads(payload)
-    except json.JSONDecodeError:
-        return None
-
-    if result.get("status") != "ok":
-        return None
-
-    results = result.get("results") or []
-    if not results:
-        return None
-
-    best = results[0]
-    recordings = best.get("recordings") or []
-    if not recordings:
-        return None
-    rec = recordings[0]
-    rec_title = (rec.get("title") or "").strip()
-    artists = rec.get("artists") or []
-    artist_name = (artists[0].get("name") if artists and isinstance(artists[0], dict) else "")
-    artist_name = (artist_name or "").strip()
-
-    if rec_title and artist_name and artist_name.lower() not in rec_title.lower():
-        return safe_name(f"{artist_name} - {rec_title}")
-    if rec_title:
-        return safe_name(rec_title)
-    return None
 
 
 def _timestamp_to_seconds(value: str) -> float | None:
