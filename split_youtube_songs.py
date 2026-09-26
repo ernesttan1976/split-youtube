@@ -466,9 +466,7 @@ def main() -> None:
         if end is not None and end <= start:
             continue
 
-        song_dir = root / title
-        song_dir.mkdir(parents=True, exist_ok=True)
-        output = song_dir / f"{title}.{extension}"
+        output = root / f"{title}.{extension}"
         command = ["ffmpeg", "-hide_banner", "-y", "-ss", str(start)]
         if end is not None:
             command += ["-to", str(end)]

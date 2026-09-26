@@ -188,9 +188,7 @@ def split_source(
 
         # Prefix keeps ordering stable and avoids collisions when titles repeat or are truncated.
         base = safe_name(f"{index:02d} - {chapter_title}", max_length=80)
-        song_dir = root / base
-        song_dir.mkdir(parents=True, exist_ok=True)
-        destination = song_dir / f"{base}.{extension}"
+        destination = root / f"{base}.{extension}"
         if on_progress is not None:
             on_progress(index, len(chapters), base)
         args = ["ffmpeg", "-hide_banner", "-y", "-ss", str(start)]
