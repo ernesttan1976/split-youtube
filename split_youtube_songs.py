@@ -334,6 +334,31 @@ def normalize_chapters(chapters: list[dict], duration: float | None = None) -> l
     return [c for c in cleaned if c.get("start_time") is not None]
 
 
+def merge_short_chapters(chapters: list[dict], min_duration: float = 120.0) -> list[dict]:
+    """Treat short detected chapters as continuations of the preceding song."""
+    if not chapters:
+        return []
+
+    merged: list[dict] = []
+    for chapter in chapters:
+        current = dict(chapter)
+        start = float(current.get("start_time") or 0)
+        end_raw = current.get("end_time")
+        end = None if end_raw is None else float(end_raw)
+        is_short = end is not None and end - start < min_duration
+
+        if merged and is_short:
+            previous = merged[-1]
+            previous_end = previous.get("end_time")
+            if previous_end is None or end is None or end > float(previous_end):
+                previous["end_time"] = end
+            continue
+
+        merged.append(current)
+
+    return merged
+
+
 def chapters_from_silence(
     source: Path,
     duration: float | None,
@@ -436,7 +461,7 @@ def main() -> None:
     chapters = info.get("chapters") or []
     if not chapters:
         chapters = chapters_from_description(info.get("description") or "", duration)
-    chapters = normalize_chapters(chapters, duration)
+    chapters = merge_short_chapters(normalize_chapters(chapters, duration))
 
     root = Path(args.output).expanduser().resolve() / video_title
     root.mkdir(parents=True, exist_ok=True)
@@ -467,6 +492,7 @@ def main() -> None:
             ),
             duration,
         )
+        chapters = merge_short_chapters(chapters)
 
     if not chapters:
         raise SystemExit(

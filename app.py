@@ -14,6 +14,7 @@ from split_youtube_songs import (
     DEFAULT_URL,
     chapters_from_description,
     apply_track_titles,
+    merge_short_chapters,
     normalize_chapters,
     safe_name,
     smart_title_from_info,
@@ -244,7 +245,7 @@ def process_stream(
                     chapters = chapters_from_description(tracklist, duration)
                 if not chapters:
                     chapters = chapters_from_description(info.get("description") or "", duration)
-            chapters = normalize_chapters(chapters, duration)
+            chapters = merge_short_chapters(normalize_chapters(chapters, duration))
 
             # If there are no chapters and the user did not opt into auto-splitting,
             # fail fast instead of downloading the full audio.
@@ -266,9 +267,11 @@ def process_stream(
         else:
             source = Path(media_file)
             title = smart_title_from_media_path(source)
-            chapters = normalize_chapters(chapters_from_file(source), None)
+            chapters = merge_short_chapters(normalize_chapters(chapters_from_file(source), None))
             if not chapters and tracklist.strip():
-                chapters = normalize_chapters(chapters_from_description(tracklist, None), None)
+                chapters = merge_short_chapters(
+                    normalize_chapters(chapters_from_description(tracklist, None), None)
+                )
 
         if not chapters and auto_split:
             progress(0.2, desc="Detecting silences")
@@ -282,6 +285,7 @@ def process_stream(
                 ),
                 duration_from_file(source),
             )
+            chapters = merge_short_chapters(chapters)
 
         chapters = apply_track_titles(chapters, track_titles)
 
