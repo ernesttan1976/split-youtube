@@ -275,6 +275,24 @@ def chapters_from_description(description: str, duration: float | None = None) -
     return normalized
 
 
+def track_titles_from_text(tracklist: str) -> list[str]:
+    """Return newline-separated titles when the input has no timestamps."""
+    lines = [line.strip() for line in (tracklist or "").splitlines() if line.strip()]
+    if not lines or any(_TIMESTAMP_LINE_RE.search(line) for line in lines):
+        return []
+    return lines
+
+
+def apply_track_titles(chapters: list[dict], titles: list[str]) -> list[dict]:
+    """Apply user-provided titles to chapters while retaining detected timings."""
+    if not titles:
+        return chapters
+    for index, chapter in enumerate(chapters):
+        if index < len(titles):
+            chapter["title"] = titles[index]
+    return chapters
+
+
 def normalize_chapters(chapters: list[dict], duration: float | None = None) -> list[dict]:
     """Normalize chapter dicts to have float start/end times; infer missing ends when possible."""
     if not chapters:

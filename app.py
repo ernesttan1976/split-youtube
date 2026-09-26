@@ -13,10 +13,12 @@ import gradio as gr
 from split_youtube_songs import (
     DEFAULT_URL,
     chapters_from_description,
+    apply_track_titles,
     normalize_chapters,
     safe_name,
     smart_title_from_info,
     smart_title_from_media_path,
+    track_titles_from_text,
 )
 
 
@@ -225,6 +227,7 @@ def process_stream(
         work = Path(temporary)
         output = work / "songs"
         output.mkdir()
+        track_titles = track_titles_from_text(tracklist)
         if url.strip():
             url = url.strip()
             progress(0, desc="Fetching metadata")
@@ -248,7 +251,7 @@ def process_stream(
             if not chapters and not auto_split:
                 yield (
                     None,
-                    "No chapters/tracklist found. Paste timestamps in the tracklist box, "
+                    "No chapters/tracklist found. Paste timestamps or one title per line in the tracklist box, "
                     "or enable 'Auto split by silence' (can be slow for long videos).",
                 )
                 return
@@ -279,6 +282,8 @@ def process_stream(
                 ),
                 duration_from_file(source),
             )
+
+        chapters = apply_track_titles(chapters, track_titles)
 
         progress(0.3, desc="Splitting tracks")
 
@@ -331,8 +336,8 @@ with gr.Blocks(title="Song Splitter") as demo:
         url = gr.Textbox(label="YouTube URL", placeholder=DEFAULT_URL)
         media_file = gr.File(label="Or choose a local audio/video file", type="filepath", file_types=[".mp4", ".mkv", ".webm", ".m4a", ".mp3", ".wav"])
     tracklist = gr.Textbox(
-        label="Optional tracklist timestamps",
-        placeholder="0:00 Intro\n3:12 Track Name\n...",
+        label="Optional tracklist (timestamps or one title per line)",
+        placeholder="0:00 Intro\n3:12 Track Name\n...\n\nOr:\nIntro\nTrack Name\n...",
         lines=6,
     )
 
